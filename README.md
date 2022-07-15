@@ -10,11 +10,12 @@ USAGE:
     conventional-semver-rs [OPTIONS] <PATH>
 
 ARGS:
-    <PATH>
+    <PATH>    Path to target git repository [default: .]
 
 OPTIONS:
     -h, --help       Print help information
-    -r, --release
+    -r, --release    Generate final release version
+    -t, --tag        Tag the current commit with the release version
     -V, --version    Print version information
 ```
 
@@ -31,9 +32,4 @@ Release versions are generated when the either of the following conditions are t
 - The `--release` option _is_ specified.
 - Structure is `{MAJOR}.{MINOR}.{PATCH}`
     - Example: `0.3.0`
-
-### Dirty Versions
-Dirty versions are generated whenever the repository has uncommitted changes.
-`convention-semver-rs` will append a `-dirty` flag to your version.
-- Example: `0.3.0-2-g3229751-dirty`
 

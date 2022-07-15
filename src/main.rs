@@ -22,10 +22,15 @@ const COMMIT_TYPE_FEAT: &str = "feat";
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
 struct CmdArgs {
+    /// Generate final release version
     #[clap(short, long, value_parser, default_value_t = false)]
     release: bool,
+
+    /// Tag the current commit with the release version
     #[clap(short, long, value_parser, default_value_t = false)]
     tag: bool,
+
+    /// Path to target git repository
     #[clap(value_parser, default_value_t = String::from("."))]
     path: String
 }
@@ -91,7 +96,7 @@ fn run(args: &CmdArgs) -> Result<(), Error> {
         }
     }
 
-    if args.tag && rev_tag.is_none(){
+    if args.tag {
         // Tag the repository with a version
         let sig_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
