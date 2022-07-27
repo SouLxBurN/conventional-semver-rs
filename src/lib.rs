@@ -1,7 +1,7 @@
 extern crate custom_error;
 use custom_error::custom_error;
 use conventional_commits_parser::parse_commit_msg;
-use git2::{Repository, DescribeOptions, DescribeFormatOptions, ObjectType, Oid, Revwalk, Reference};
+use git2::{Repository, ObjectType, Oid, Revwalk, Reference};
 use semver::{Version, Prerelease, BuildMetadata};
 
 custom_error! { pub Error
@@ -18,6 +18,7 @@ enum VersionBump {
 
 struct VersionBumpDetails {
     bump_type: VersionBump,
+    current_version: Version,
     rev_count: u32,
 }
 
@@ -25,80 +26,64 @@ const COMMIT_TYPE_FEAT: &str = "feat";
 
 pub fn run(repo_path: &str, is_release: bool) -> Result<String, Error> {
     let repo = Repository::open(&repo_path)?;
-    let v_input = match repo.describe(DescribeOptions::new().describe_tags()) {
-        Ok(describe) => describe.format(Some(&DescribeFormatOptions::new()))?,
-        Err(_) => { String::from("0.0.0") },
-    };
 
-    let mut version = match Version::parse(&v_input) {
-        Ok(v) => v,
-        Err(e) => panic!("Unable to parse {} as valid semver: {}", v_input, e)
-    };
-
-    // Zero commits. // Not supported.
     let head = repo.head()?.peel_to_commit().unwrap();
     let head_id = head.as_object().id();
-    let rev_tag = get_revision_tag(&repo, head_id);
-    if rev_tag.is_none() {
-        let mut refs = repo.revwalk()?;
-        refs.push(head_id)?;
+    let mut refs = repo.revwalk()?;
+    refs.push(head_id)?;
 
-        let v_result = derive_version_increase(&repo, refs);
-        match v_result {
-            Ok(details) => {
-                match details.bump_type {
-                    VersionBump::MAJOR => {
-                        version.major += 1;
-                        version.minor = 0;
-                        version.patch = 0;
-                    },
-                    VersionBump::MINOR => {
-                        version.minor += 1;
-                        version.patch = 0;
-                    }
-                    _ => version.patch += 1,
-                }
-                version.pre = Prerelease::new(&details.rev_count.to_string()).unwrap_or_default();
-                let mut oid_str = head_id.to_string();
-                let build = &oid_str.as_mut_str()[..7];
-                version.build = BuildMetadata::new(&build).unwrap_or_default();
-            },
-            Err(e) => {
-                version.patch += 1;
-                println!("Encountered an error when deriving version increase: {}", e);
-            },
+    let details = derive_version_increase(&repo, refs)?;
+    let mut version = details.current_version;
+    match details.bump_type {
+        VersionBump::MAJOR => {
+            version.major += 1;
+            version.minor = 0;
+            version.patch = 0;
+        },
+        VersionBump::MINOR => {
+            version.minor += 1;
+            version.patch = 0;
         }
-
-        // Remove Prerelease and build metadata if releasing.
-        if is_release {
-            version.pre = Prerelease::EMPTY;
-            version.build = BuildMetadata::EMPTY;
-        }
+        _ => version.patch += 1,
     }
+    version.pre = Prerelease::new(&details.rev_count.to_string()).unwrap_or_default();
+    let mut oid_str = head_id.to_string();
+    let build = &oid_str.as_mut_str()[..7];
+    version.build = BuildMetadata::new(&build).unwrap_or_default();
+
+    // Remove Prerelease and build metadata if releasing.
+    if is_release {
+        version.pre = Prerelease::EMPTY;
+        version.build = BuildMetadata::EMPTY;
+    }
+
     Ok(version.to_string())
 }
 
 /// Checks if the provided Oid is a tagged revision in the Repository.
-/// Returns the name of the tag if found.
-fn get_revision_tag(repo: &Repository, oid: Oid) -> Option<String> {
-    let mut tag_refs = repo.references_glob("refs/tags/*").ok()?;
-    let tag_item = tag_refs.find(does_reference_target_commit(oid))?;
-    let id = tag_item.ok()?;
-    let t_name = id.name()?;
-    Some(t_name.to_owned())
+/// Returns a list of all the tag names if found.
+fn get_revision_tags(repo: &Repository, oid: Oid) -> Option<Vec<Version>> {
+    let tag_refs = repo.references_glob("refs/tags/*").ok()?;
+    let tag_items: Vec<Version> = tag_refs.filter_map(does_reference_target_commit(oid))
+        .filter_map( |rev| -> Option<Version> {
+            // TODO Don't just 10.. this thing. Thats fragile.
+            Some(Version::parse(&rev[10..]).ok()?)
+        }).collect();
+    if tag_items.len() > 0 {
+        return Some(tag_items)
+    }
+    None
 }
 
 /// Creates and returns a closure for determining if a Reference points to a given Oid/commit id.
-fn does_reference_target_commit(commit_id: Oid) -> impl FnMut(&Result<Reference, git2::Error>) -> bool {
-    move |t_ref: &Result<Reference, git2::Error>| {
-        if let Ok(id) = t_ref {
-            if let Some(coid) = id.peel_to_commit().ok() {
-                if coid.as_object().id() == commit_id {
-                    return true;
-                }
-            }
+fn does_reference_target_commit(commit_id: Oid) -> impl FnMut(Result<Reference, git2::Error>) -> Option<String> {
+    move |ref_res: Result<Reference, git2::Error>| {
+        let reference = ref_res.as_ref().ok()?;
+        let coid = reference.peel_to_commit().ok()?;
+        if coid.as_object().id() == commit_id {
+            return Some(reference.name()?.to_owned());
         }
-        false
+        None
     }
 }
 
@@ -106,11 +91,19 @@ fn does_reference_target_commit(commit_id: Oid) -> impl FnMut(&Result<Reference,
 /// Crawls the repository refs from the refs HEAD to the most recent tag.
 fn derive_version_increase(repo: &Repository, mut refs: Revwalk) -> Result<VersionBumpDetails, Error> {
     let mut bump_type = VersionBump::PATCH;
+    let mut current_version = Version::new(0, 0, 0);
     let mut rev_count = 0u32;
 
     while let Some(oid) = refs.next().transpose()? {
-        if let Some(_) = get_revision_tag(&repo, oid) {
-            return Ok(VersionBumpDetails{bump_type, rev_count});
+        if let Some(tags) = get_revision_tags(&repo, oid) {
+            if tags.len() == 1 {
+                current_version = tags[0].clone();
+                return Ok(VersionBumpDetails{bump_type, current_version, rev_count});
+            } else {
+                println!("Multiple tags on one commit detected");
+                current_version = tags[0].clone();
+                return Ok(VersionBumpDetails{bump_type, current_version, rev_count});
+            }
         }
         bump_type = match derive_version_from_commit(repo, oid, bump_type.clone()) {
             Some(v) => v,
@@ -118,7 +111,7 @@ fn derive_version_increase(repo: &Repository, mut refs: Revwalk) -> Result<Versi
         };
         rev_count += 1;
     }
-    Ok(VersionBumpDetails{bump_type, rev_count})
+    Ok(VersionBumpDetails{bump_type, current_version, rev_count})
 }
 
 ///
