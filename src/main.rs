@@ -16,21 +16,16 @@ struct CmdArgs {
     path: String
 }
 
-fn main() {
+fn main() -> Result<(), conventional_semver_rs::Error> {
     let args = CmdArgs::parse();
-    match conventional_semver_rs::run(&args.path, args.release) {
-        Ok(version) => {
-            println!("{}", version);
-            if args.tag {
-                match release::tag_release(&args.path, version) {
-                    Ok(oid) => println!("Tag created successfully! {}", oid),
-                    Err(e) => println!("Unable to tag respository: {}", e),
-                }
-            }
-        },
-        Err(e) => println!("{e}"),
-    };
+    let version = conventional_semver_rs::run(&args.path, args.release)?;
+    println!("{}", version);
+    if args.tag {
+        let oid = release::tag_release(&args.path, version)?;
+        println!("Tag created successfully! {}", oid);
+        // Err(e) => println!("Unable to tag respository: {}", e),
+    }
 
-
+    Ok(())
 }
 

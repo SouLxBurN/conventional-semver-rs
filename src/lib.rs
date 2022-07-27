@@ -85,7 +85,7 @@ fn get_revision_tag(repo: &Repository, oid: Oid) -> Option<String> {
     let tag_item = tag_refs.find(does_reference_target_commit(oid))?;
     let id = tag_item.ok()?;
     let t_name = id.name()?;
-    return Some(t_name.to_owned());
+    Some(t_name.to_owned())
 }
 
 /// Creates and returns a closure for determining if a Reference points to a given Oid/commit id.
@@ -118,7 +118,7 @@ fn derive_version_increase(repo: &Repository, mut refs: Revwalk) -> Result<Versi
         };
         rev_count += 1;
     }
-    return Ok(VersionBumpDetails{bump_type, rev_count});
+    Ok(VersionBumpDetails{bump_type, rev_count})
 }
 
 ///

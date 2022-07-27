@@ -13,5 +13,5 @@ pub fn tag_release(repo_path: &str, version: String) -> Result<Oid, Error> {
     let sig = Signature::new("rs-release", "rs-release@rust.com", &Time::new(sig_time.try_into().unwrap(), 0)).unwrap();
 
     let head = repo.head()?.peel_to_commit().unwrap();
-    return repo.tag(&version.to_string(), head.as_object(), &sig, "", false)
+    repo.tag(&version.to_string(), head.as_object(), &sig, "", false)
 }
