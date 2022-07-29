@@ -26,7 +26,6 @@ const COMMIT_TYPE_FEAT: &str = "feat";
 
 pub fn run(repo_path: &str, is_release: bool) -> Result<String, Error> {
     let repo = Repository::open(&repo_path)?;
-
     let head = repo.head()?.peel_to_commit().unwrap();
     let head_id = head.as_object().id();
     match get_revision_tags(&repo, head_id) {
@@ -79,7 +78,11 @@ fn get_revision_tags(repo: &Repository, oid: Oid) -> Option<Vec<Version>> {
     let tag_items: Vec<Version> = tag_refs.filter_map(does_reference_target_commit(oid))
         .filter_map( |rev| -> Option<Version> {
             // TODO Don't just 10.. this thing. Thats fragile.
-            Some(Version::parse(&rev[10..]).ok()?)
+            let parsed = Version::parse(&rev[10..]).ok()?;
+                if parsed.pre.is_empty() && parsed.build.is_empty() {
+                   return Some(parsed);
+                }
+                None
         }).collect();
     if tag_items.len() > 0 {
         return Some(tag_items)
