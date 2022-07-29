@@ -29,9 +29,28 @@ pub fn run(repo_path: &str, is_release: bool) -> Result<String, Error> {
 
     let head = repo.head()?.peel_to_commit().unwrap();
     let head_id = head.as_object().id();
+    match get_revision_tags(&repo, head_id) {
+        Some(versions) => {
+            // Head commit is currently tagged, rebuild with highest version.
+            Ok(determine_current_version(versions).to_string())
+        },
+        None => {
+            let mut version = dervive_next_version(&repo, head_id)?;
+            // Remove Prerelease and build metadata if releasing.
+            if is_release {
+                version.pre = Prerelease::EMPTY;
+                version.build = BuildMetadata::EMPTY;
+            }
+            Ok(version.to_string())
+        }
+    }
+}
+
+/// Walks all commits and returns a prerelease version based on the commits
+/// encountered between the head_id commit and the previous tag.
+fn dervive_next_version(repo: &Repository, head_id: Oid) -> Result<Version, Error> {
     let mut refs = repo.revwalk()?;
     refs.push(head_id)?;
-
     let details = derive_version_increase(&repo, refs)?;
     let mut version = details.current_version;
     match details.bump_type {
@@ -50,14 +69,7 @@ pub fn run(repo_path: &str, is_release: bool) -> Result<String, Error> {
     let mut oid_str = head_id.to_string();
     let build = &oid_str.as_mut_str()[..7];
     version.build = BuildMetadata::new(&build).unwrap_or_default();
-
-    // Remove Prerelease and build metadata if releasing.
-    if is_release {
-        version.pre = Prerelease::EMPTY;
-        version.build = BuildMetadata::EMPTY;
-    }
-
-    Ok(version.to_string())
+    Ok(version)
 }
 
 /// Checks if the provided Oid is a tagged revision in the Repository.
@@ -96,14 +108,8 @@ fn derive_version_increase(repo: &Repository, mut refs: Revwalk) -> Result<Versi
 
     while let Some(oid) = refs.next().transpose()? {
         if let Some(tags) = get_revision_tags(&repo, oid) {
-            if tags.len() == 1 {
-                current_version = tags[0].clone();
-                return Ok(VersionBumpDetails{bump_type, current_version, rev_count});
-            } else {
-                println!("Multiple tags on one commit detected");
-                current_version = tags[0].clone();
-                return Ok(VersionBumpDetails{bump_type, current_version, rev_count});
-            }
+            current_version = determine_current_version(tags);
+            return Ok(VersionBumpDetails{bump_type, current_version, rev_count});
         }
         bump_type = match derive_version_from_commit(repo, oid, bump_type.clone()) {
             Some(v) => v,
@@ -112,6 +118,27 @@ fn derive_version_increase(repo: &Repository, mut refs: Revwalk) -> Result<Versi
         rev_count += 1;
     }
     Ok(VersionBumpDetails{bump_type, current_version, rev_count})
+}
+
+/// From a list of versions, determine the largest or most recent version
+/// based on semantic verisoning.
+fn determine_current_version(tags: Vec<Version>) -> Version {
+    tags.iter().reduce(|accum: &Version, item: &Version| -> &Version {
+        let accum_compare = semver::Comparator{
+            op: semver::Op::LessEq,
+            major: accum.major,
+            minor: Some(accum.minor),
+            patch: Some(accum.patch),
+            pre: accum.pre.clone(),
+        };
+
+        if accum_compare.matches(item) {
+            accum
+        }
+        else {
+            item
+        }
+    }).unwrap().clone()
 }
 
 ///
