@@ -3,6 +3,7 @@ use custom_error::custom_error;
 use conventional_commits_parser::parse_commit_msg;
 use git2::{Repository, ObjectType, Oid, Revwalk, Reference};
 use semver::{Version, Prerelease, BuildMetadata};
+use regex::Regex;
 
 custom_error! { pub Error
     SemverError{source: semver::Error} = "Encountered an invalid version: {source}.",
@@ -39,6 +40,7 @@ pub fn run(repo_path: &str, is_release: bool) -> Result<String, Error> {
             if is_release {
                 version.pre = Prerelease::EMPTY;
                 version.build = BuildMetadata::EMPTY;
+
             }
             Ok(version.to_string())
         }
@@ -74,11 +76,12 @@ fn dervive_next_version(repo: &Repository, head_id: Oid) -> Result<Version, Erro
 /// Checks if the provided Oid is a tagged revision in the Repository.
 /// Returns a list of all the tag names if found.
 fn get_revision_tags(repo: &Repository, oid: Oid) -> Option<Vec<Version>> {
+    let reg = Regex::new(r"^.*(\d+\.\d+\.\d+.*)$").unwrap();
     let tag_refs = repo.references_glob("refs/tags/*").ok()?;
     let tag_items: Vec<Version> = tag_refs.filter_map(does_reference_target_commit(oid))
         .filter_map( |rev| -> Option<Version> {
-            // TODO Don't just 10.. this thing. Thats fragile.
-            let parsed = Version::parse(&rev[10..]).ok()?;
+            let tag_version = reg.captures(&rev)?.get(1)?.as_str();
+            let parsed = Version::parse(tag_version).ok()?;
                 if parsed.pre.is_empty() && parsed.build.is_empty() {
                    return Some(parsed);
                 }
