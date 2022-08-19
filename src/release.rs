@@ -12,6 +12,7 @@ custom_error! { pub Error
     VersionMatchError{file: String} = "Unable find version in version file {file}",
 }
 
+#[derive(Debug)]
 pub struct VersionFile {
     relative_path: String,
     matcher: Regex,

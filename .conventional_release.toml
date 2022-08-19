@@ -1,0 +1,3 @@
+lead_v = false
+file = "version.txt"
+# file = { path = "version.txt", matcher = "(?P<v>version: )([vV]?\d+\.\d+\.\d+\S*)" }
