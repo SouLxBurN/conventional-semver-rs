@@ -1,3 +1,10 @@
 lead_v = false
-file = "version.txt"
-# file = { path = "version.txt", matcher = "(?P<v>version: )([vV]?\d+\.\d+\.\d+\S*)" }
+
+[[version_files]]
+path = "version.txt"
+version_prefix = "version: "
+version_postfix = ""
+[[version_files]]
+path = "monster.toml"
+version_prefix = "version = \""
+version_postfix = "\"[^,]"

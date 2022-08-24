@@ -1,8 +1,7 @@
-mod release;
-mod config;
 use clap::Parser;
+use conventional_semver_rs::release;
+use conventional_semver_rs::config;
 
-use crate::release::VersionFile;
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
 struct CmdArgs {
@@ -11,7 +10,7 @@ struct CmdArgs {
     release: bool,
 
     /// Tag the current commit with the release version
-   #[clap(short, long, value_parser, default_value_t = false)]
+    #[clap(short, long, value_parser, default_value_t = false)]
     tag: bool,
 
     /// Add an optional leading v to the generated version i.e. (v2.1.3)
@@ -29,10 +28,16 @@ struct CmdArgs {
 
 fn main() -> Result<(), conventional_semver_rs::Error> {
     let args = CmdArgs::parse();
-    let mut version = conventional_semver_rs::run(&args.path, args.release)?;
+    let mut version = conventional_semver_rs::derive_version(&args.path, args.release)?;
 
-    let config = config::ConventionSemverConfig::load_config();
-    dbg!(config);
+    let config = config::ConventionSemverConfig::load_config().unwrap();
+    let files = config.version_files.iter().map(|v_file| -> release::VersionFile {
+        release::VersionFile::new(
+            v_file.path.clone(),
+            v_file.version_prefix.clone(),
+            v_file.version_postfix.clone(),
+        ).unwrap()
+    }).collect();
 
     let insert_v = !version.starts_with(|begin: char| begin.eq_ignore_ascii_case(&'v'));
     if args.lead_v && insert_v  {
@@ -40,18 +45,8 @@ fn main() -> Result<(), conventional_semver_rs::Error> {
     }
 
     println!("{}", version);
-    if args.tag {
-        let oid = release::tag_release(&args.path, &version)?;
-        println!("Tag created successfully! {}", oid);
-        // Err(e) => println!("Unable to tag respository: {}", e),
-    }
 
     if args.bump_files {
-        let files = vec![
-            VersionFile::new(String::from("version.txt"), String::from(r"(?P<v>version: )([vV]?\d+\.\d+\.\d+\S*)")).unwrap(),
-            VersionFile::new(String::from("monster.txt"), String::from(r"(?P<v>version: )([vV]?\d+\.\d+\.\d+\S*)")).unwrap(),
-            VersionFile::new(String::from("nothing.txt"), String::from(r"(?P<v>version: )([vV]?\d+\.\d+\.\d+\S*)")).unwrap()
-        ];
         let release_errors = release::bump_version_files(&args.path, &version, files);
         if release_errors.len() > 0 {
             release_errors.iter().for_each(|e| {
@@ -60,6 +55,13 @@ fn main() -> Result<(), conventional_semver_rs::Error> {
         } else {
             println!("Version files updated!");
         }
+
+        // TODO: Commit the version files
+    }
+
+    if args.tag {
+        let oid = release::tag_release(&args.path, &version)?;
+        println!("Tag created successfully! {}", oid);
     }
 
     Ok(())

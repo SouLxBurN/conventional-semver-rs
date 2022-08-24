@@ -1,3 +1,5 @@
+pub mod release;
+pub mod config;
 extern crate custom_error;
 use custom_error::custom_error;
 use git2::{Repository, ObjectType, Oid, Revwalk, Reference};
@@ -46,7 +48,7 @@ impl ParsedVersion {
     }
 }
 
-pub fn run(repo_path: &str, is_release: bool) -> Result<String, Error> {
+pub fn derive_version(repo_path: &str, is_release: bool) -> Result<String, Error> {
     let repo = Repository::open(&repo_path)?;
     let head = repo.head()?.peel_to_commit().unwrap();
     let head_id = head.as_object().id();

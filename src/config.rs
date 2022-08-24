@@ -4,20 +4,20 @@ use std::{fs, io};
 
 #[derive(Deserialize, Debug)]
 pub struct ConventionSemverConfig {
-    lead_v: bool,
-    file: String,
-    // file: VersionFileConfig,
+    pub lead_v: bool,
+    pub version_files: Vec<VersionFileConfig>,
 }
 
-// #[derive(Deserialize, Debug)]
-// pub struct VersionFileConfig {
-//     path: String,
-//     matcher: String,
-// }
+#[derive(Deserialize, Debug)]
+pub struct VersionFileConfig {
+    pub path: String,
+    pub version_prefix: String,
+    pub version_postfix: String,
+}
 
 impl ConventionSemverConfig {
-    pub fn new(lead_v: bool, file: String) -> Self {
-        Self { lead_v, file }
+    pub fn new(lead_v: bool, version_files: Vec<VersionFileConfig>) -> Self {
+        Self { lead_v, version_files }
     }
 
     pub fn load_config() -> Result<Self, io::Error> {
