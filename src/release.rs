@@ -7,23 +7,51 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use git2::{Signature, Time, Repository, Oid};
 use regex::Regex;
 
+use crate::config::ConventionSemverConfig;
+
 custom_error! { pub Error
     VersionFileError{source: io::Error, file: String} = "Version file error({file}): {source}.",
     VersionMatchError{file: String} = "Unable find version in version file {file}",
 }
 
+static SEMVER_MATCHER: &str = r"[vV]?\d+\.\d+\.\d+[-+\w\.]*";
+
+#[derive(Debug)]
 pub struct VersionFile {
     relative_path: String,
     matcher: Regex,
 }
 impl VersionFile {
-    pub fn new(path: String, matcher: String) -> Result<Self, regex::Error> {
-        let regex = Regex::new(&matcher)?;
+    pub fn new(path: String, version_prefix: String, version_postfix: String) -> Result<Self, regex::Error> {
+        let regex = construct_matcher(version_prefix, version_postfix)?;
         Ok(VersionFile{
             relative_path: path,
             matcher: regex,
         })
     }
+
+    pub fn config_to_version_files(config: ConventionSemverConfig) -> Vec<VersionFile> {
+        match config.version_files {
+            None => vec![],
+            Some(version_files) => {
+                version_files.iter().map(|v_file| -> VersionFile {
+                    VersionFile::new(
+                        v_file.path.clone(),
+                        v_file.version_prefix.as_ref().unwrap().clone(),
+                        v_file.version_postfix.as_ref().unwrap().clone(),
+                    ).unwrap()
+                }).collect()
+            }
+        }
+    }
+}
+
+/// Compiles the provided prefix and postfix into a Regex with the SEMVER_MATCHER constant
+/// Example: `version_prefix: "version = \\""`, `version_postfix: "\\"[^,]"`
+/// Compiled: `(version = \\"){SEMVER_MATCHER}(\\"[^,])`
+/// Matches: `version = "2.12.18"`
+fn construct_matcher(prefix: String, postfix: String) -> Result<regex::Regex, regex::Error> {
+    Ok(Regex::new(&format!("({}){}({})", prefix, SEMVER_MATCHER, postfix))?)
 }
 
 /// Update versions in various version files.
@@ -43,7 +71,7 @@ pub fn bump_version_files(repo_path: &str, version: &str, files: Vec<VersionFile
             Some(c) => c,
             None => return Some(Error::VersionMatchError{file: f.relative_path.clone()}),
         };
-        let cow = f.matcher.replace_all(&contents, format!("{}{}", cap[1].to_string(), version));
+        let cow = f.matcher.replace_all(&contents, format!("{}{}{}", cap[1].to_string(), version, cap[2].to_string()));
 
         // Don't write to file until files have been updated.
         // Update file
@@ -57,6 +85,8 @@ pub fn bump_version_files(repo_path: &str, version: &str, files: Vec<VersionFile
 
 /// Tag Head commit of Repository as repo_path, with the provided version.
 /// Handling version files TBD.
+/// TODO: Should return conventional_semver::Error, don't expose the git2 lib
+/// to clients.
 pub fn tag_release(repo_path: &str, version: &str) -> Result<Oid, git2::Error> {
     let repo = Repository::open(&repo_path)?;
     // Tag the repository with a version

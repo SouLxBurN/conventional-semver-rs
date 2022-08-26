@@ -1,0 +1,6 @@
+v = false
+
+[[version_files]]
+path = "Cargo.toml"
+version_prefix = "version = \""
+version_postfix = "\"[^,]"

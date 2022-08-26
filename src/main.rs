@@ -1,5 +1,6 @@
-mod release;
 use clap::Parser;
+use conventional_semver_rs::release;
+use conventional_semver_rs::config;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about)]
@@ -27,30 +28,42 @@ struct CmdArgs {
 
 fn main() -> Result<(), conventional_semver_rs::Error> {
     let args = CmdArgs::parse();
-    let mut version = conventional_semver_rs::run(&args.path, args.release)?;
 
+    let config = match config::ConventionSemverConfig::load_config() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("{e}");
+            eprintln!("Using default configuration");
+            config::ConventionSemverConfig::default()
+        }
+    };
+
+    // TODO: derive version should accept config
+    let mut version = conventional_semver_rs::derive_version(&args.path, args.release)?;
+
+    // TODO: This option should probably be part of the config
     let insert_v = !version.starts_with(|begin: char| begin.eq_ignore_ascii_case(&'v'));
     if args.lead_v && insert_v  {
         version.insert(0, 'v');
     }
 
     println!("{}", version);
-    if args.tag {
-        let oid = release::tag_release(&args.path, &version)?;
-        println!("Tag created successfully! {}", oid);
-        // Err(e) => println!("Unable to tag respository: {}", e),
-    }
 
     if args.bump_files {
-        let files = vec![];
-        let release_errors = release::bump_version_files(&args.path, &version, files);
+        let release_errors = release::bump_version_files(&args.path,
+            &version,
+            release::VersionFile::config_to_version_files(config));
         if release_errors.len() > 0 {
             release_errors.iter().for_each(|e| {
                 eprintln!("{}", e);
             });
-        } else {
-            println!("Version files updated!");
         }
+        // TODO: Commit the version files
+    }
+
+    if args.tag {
+        let oid = release::tag_release(&args.path, &version)?;
+        println!("Tag created successfully! {}", oid);
     }
 
     Ok(())
