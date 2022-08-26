@@ -38,13 +38,6 @@ fn main() -> Result<(), conventional_semver_rs::Error> {
             config::ConventionSemverConfig::default()
         }
     };
-    let files = config.version_files.iter().map(|v_file| -> release::VersionFile {
-        release::VersionFile::new(
-            v_file.path.clone(),
-            v_file.version_prefix.clone(),
-            v_file.version_postfix.clone(),
-        ).unwrap()
-    }).collect();
 
     let insert_v = !version.starts_with(|begin: char| begin.eq_ignore_ascii_case(&'v'));
     if args.lead_v && insert_v  {
@@ -54,7 +47,9 @@ fn main() -> Result<(), conventional_semver_rs::Error> {
     println!("{}", version);
 
     if args.bump_files {
-        let release_errors = release::bump_version_files(&args.path, &version, files);
+        let release_errors = release::bump_version_files(&args.path,
+            &version,
+            release::VersionFile::config_to_version_files(config));
         if release_errors.len() > 0 {
             release_errors.iter().for_each(|e| {
                 eprintln!("{}", e);
