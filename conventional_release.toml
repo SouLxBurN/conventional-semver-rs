@@ -1,11 +1,6 @@
-lead_v = false
+v = false
 
 [[version_files]]
-path = "version.txt"
-version_prefix = ""
-version_postfix = ""
-[[version_files]]
-path = "monster.toml"
-predefined = "cargo.toml"
+path = "Cargo.toml"
 version_prefix = "version = \""
 version_postfix = "\"[^,]"

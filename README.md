@@ -7,16 +7,43 @@ __Blazingly Fast__ 🚀 CLI tool for determining the next semantic version for a
 ## Usage
 ```
 USAGE:
-    conventional-semver-rs [OPTIONS] <PATH>
+    conventional-semver-rs [OPTIONS] [PATH]
 
 ARGS:
     <PATH>    Path to target git repository [default: .]
 
 OPTIONS:
-    -h, --help       Print help information
-    -r, --release    Generate final release version
-    -t, --tag        Tag the current commit with the release version
-    -V, --version    Print version information
+    -f, --bump-files    Bump the version files with the derived version
+    -h, --help          Print help information
+    -r, --release       Generate final release version
+    -t, --tag           Tag the current commit with the release version
+    -v, --lead-v        Add an optional leading v to the generated version i.e. (v2.1.3)
+    -V, --version       Print version information
+```
+
+### Configuration
+conventional-semver-rs will look in the root of the repositories directory for a `conventional_release.toml` file. This configuration will be applied when generating versions of updating version files.
+If `conventional_release.toml` is not found, a default configuration will be loaded.
+
+#### Default Configuration
+```toml
+v = false
+```
+
+#### Configuration Options
+```toml
+v = false # Include optional prefix v in generated version
+
+# Describes a file containing the application's version to be updated on release
+[[version_files]] path = "version.txt" # Relative path to file
+version_prefix = "" # Token to match before the version
+version_postfix = "" # Token to match after the version
+
+# Cargo.toml example
+[[version_files]]
+path = "Cargo.toml"
+version_prefix = "version = \""
+version_postfix = "\"[^,]"
 ```
 
 ### Pre-release Versions

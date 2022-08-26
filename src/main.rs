@@ -28,7 +28,6 @@ struct CmdArgs {
 
 fn main() -> Result<(), conventional_semver_rs::Error> {
     let args = CmdArgs::parse();
-    let mut version = conventional_semver_rs::derive_version(&args.path, args.release)?;
 
     let config = match config::ConventionSemverConfig::load_config() {
         Ok(cfg) => cfg,
@@ -39,6 +38,10 @@ fn main() -> Result<(), conventional_semver_rs::Error> {
         }
     };
 
+    // TODO: derive version should accept config
+    let mut version = conventional_semver_rs::derive_version(&args.path, args.release)?;
+
+    // TODO: This option should probably be part of the config
     let insert_v = !version.starts_with(|begin: char| begin.eq_ignore_ascii_case(&'v'));
     if args.lead_v && insert_v  {
         version.insert(0, 'v');
@@ -54,10 +57,7 @@ fn main() -> Result<(), conventional_semver_rs::Error> {
             release_errors.iter().for_each(|e| {
                 eprintln!("{}", e);
             });
-        } else {
-            println!("Version files updated!");
         }
-
         // TODO: Commit the version files
     }
 

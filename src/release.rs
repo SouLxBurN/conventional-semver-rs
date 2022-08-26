@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use git2::{Signature, Time, Repository, Oid};
 use regex::Regex;
 
-use crate::config;
+use crate::config::ConventionSemverConfig;
 
 custom_error! { pub Error
     VersionFileError{source: io::Error, file: String} = "Version file error({file}): {source}.",
@@ -30,14 +30,19 @@ impl VersionFile {
         })
     }
 
-    pub fn config_to_version_files(config: config::ConventionSemverConfig) -> Vec<VersionFile> {
-        config.version_files.iter().map(|v_file| -> VersionFile {
-            VersionFile::new(
-                v_file.path.clone(),
-                v_file.version_prefix.as_ref().unwrap().clone(),
-                v_file.version_postfix.as_ref().unwrap().clone(),
-            ).unwrap()
-        }).collect()
+    pub fn config_to_version_files(config: ConventionSemverConfig) -> Vec<VersionFile> {
+        match config.version_files {
+            None => vec![],
+            Some(version_files) => {
+                version_files.iter().map(|v_file| -> VersionFile {
+                    VersionFile::new(
+                        v_file.path.clone(),
+                        v_file.version_prefix.as_ref().unwrap().clone(),
+                        v_file.version_postfix.as_ref().unwrap().clone(),
+                    ).unwrap()
+                }).collect()
+            }
+        }
     }
 }
 
