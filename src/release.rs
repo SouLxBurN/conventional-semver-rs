@@ -6,6 +6,9 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use git2::{Signature, Time, Repository, Oid};
 use regex::Regex;
+use phf::phf_map;
+
+use crate::config;
 
 custom_error! { pub Error
     VersionFileError{source: io::Error, file: String} = "Version file error({file}): {source}.",
@@ -13,6 +16,12 @@ custom_error! { pub Error
 }
 
 const SEMVER_MATCHER: &str = r"[vV]?\d+\.\d+\.\d+[-+\w\.]*";
+
+// static KNOWN_VERSION_FILES: phf::Map<&'static str, &'static str> = phf_map! {
+//     "package.json" => &(String::from("\"version\": \"") + SEMVER_MATCHER + "\""),
+//     "Cargo.toml" => &(String::from("version = \"") + SEMVER_MATCHER + "\"[^,]"),
+// };
+
 
 #[derive(Debug)]
 pub struct VersionFile {
@@ -27,6 +36,17 @@ impl VersionFile {
             matcher: regex,
         })
     }
+
+    pub fn config_to_version_files(config: config::ConventionSemverConfig) -> Vec<VersionFile> {
+        config.version_files.iter().map(|v_file| -> VersionFile {
+            VersionFile::new(
+                v_file.path.clone(),
+                v_file.version_prefix.clone(),
+                v_file.version_postfix.clone(),
+            ).unwrap()
+        }).collect()
+    }
+
 }
 
 /// Compiles the provided prefix and postfix into a Regex with the SEMVER_MATCHER constant

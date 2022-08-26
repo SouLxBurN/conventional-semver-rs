@@ -30,7 +30,14 @@ fn main() -> Result<(), conventional_semver_rs::Error> {
     let args = CmdArgs::parse();
     let mut version = conventional_semver_rs::derive_version(&args.path, args.release)?;
 
-    let config = config::ConventionSemverConfig::load_config().unwrap();
+    let config = match config::ConventionSemverConfig::load_config() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("{e}");
+            eprintln!("Using default configuration");
+            config::ConventionSemverConfig::default()
+        }
+    };
     let files = config.version_files.iter().map(|v_file| -> release::VersionFile {
         release::VersionFile::new(
             v_file.path.clone(),

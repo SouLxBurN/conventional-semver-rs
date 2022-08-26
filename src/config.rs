@@ -17,7 +17,17 @@ pub struct VersionFileConfig {
 
 impl ConventionSemverConfig {
     pub fn new(lead_v: bool, version_files: Vec<VersionFileConfig>) -> Self {
-        Self { lead_v, version_files }
+        Self {
+            lead_v,
+            version_files
+        }
+    }
+
+    pub fn default() -> Self {
+        Self {
+            lead_v: false,
+            version_files: vec![]
+        }
     }
 
     pub fn load_config() -> Result<Self, io::Error> {
