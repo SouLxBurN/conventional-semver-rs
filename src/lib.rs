@@ -1,16 +1,16 @@
 pub mod release;
 pub mod config;
 extern crate custom_error;
+
 use custom_error::custom_error;
 use git2::{Repository, ObjectType, Oid, Revwalk, Reference};
-use lenient_semver::parser::OwnedError;
 use semver::{Prerelease, BuildMetadata};
 use regex::Regex;
 
 custom_error! { pub Error
     SemverError{source: semver::Error} = "Encountered an invalid version: {source}.",
     LSemverError{source: lenient_semver::parser::OwnedError} = "Encountered an invalid version: {source}.",
-    GitError{source: git2::Error} = "Git Error: {source}"
+    GitError{source: git2::Error} = "Git Error: {source}",
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -26,6 +26,58 @@ struct VersionBumpDetails {
     rev_count: u32,
 }
 
+pub struct ConventionalRepo {
+    pub config: config::ConventionSemverConfig,
+    repo: git2::Repository
+}
+
+impl ConventionalRepo {
+    pub fn new(repo_path: &str) -> Result<Self, Error> where Self: Sized {
+        let repo = Repository::open(repo_path)?;
+        let config = match config::ConventionSemverConfig::load_config() {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                eprintln!("{e}");
+                eprintln!("Using default configuration");
+                config::ConventionSemverConfig::default()
+            }
+        };
+        Ok(ConventionalRepo{
+            repo,
+            config
+        })
+
+    }
+
+    /// Checks if repo at `repo_path` is dirty.
+    /// Returns Error result if unable to locate/open repository at `repo_path`.
+    pub fn is_repo_dirty(&self) -> Result<bool, Error> {
+        let statuses = self.repo.statuses(None)?;
+        Ok(!statuses.is_empty())
+    }
+
+    pub fn derive_version(&self, is_release: bool) -> Result<String, Error> {
+        let dirty = self.is_repo_dirty()?;
+        let head = self.repo.head()?.peel_to_commit().unwrap();
+        let head_id = head.as_object().id();
+        match get_revision_tags(&self.repo, head_id) {
+            Some(versions) if !dirty => {
+                // Head commit is currently tagged, rebuild with highest version.
+                Ok(determine_current_version(versions).original)
+            },
+            _ => {
+                let mut version = dervive_next_version(&self.repo, head_id)?;
+                // Remove Prerelease and build metadata if releasing.
+                if is_release && !dirty {
+                    version.parsed.pre = Prerelease::EMPTY;
+                    version.parsed.build = BuildMetadata::EMPTY;
+                }
+                Ok(version.parsed.to_string())
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 struct ParsedVersion {
     original: String,
@@ -33,39 +85,14 @@ struct ParsedVersion {
 }
 
 impl ParsedVersion {
-    pub fn new(version: &str) -> Result<Self, OwnedError> {
-        match lenient_semver::parse(version) {
-            Err(res) => {
-                Err(res.owned())
-            },
-            Ok(parsed) => {
-                Ok(Self{
-                    original: String::from(version),
-                    parsed,
-                })
-            },
-        }
-    }
-}
-
-pub fn derive_version(repo_path: &str, is_release: bool) -> Result<String, Error> {
-    let repo = Repository::open(&repo_path)?;
-    let head = repo.head()?.peel_to_commit().unwrap();
-    let head_id = head.as_object().id();
-    match get_revision_tags(&repo, head_id) {
-        Some(versions) => {
-            // Head commit is currently tagged, rebuild with highest version.
-            Ok(determine_current_version(versions).original)
-        },
-        None => {
-            let mut version = dervive_next_version(&repo, head_id)?;
-            // Remove Prerelease and build metadata if releasing.
-            if is_release {
-                version.parsed.pre = Prerelease::EMPTY;
-                version.parsed.build = BuildMetadata::EMPTY;
-            }
-            Ok(version.parsed.to_string())
-        }
+    pub fn new(version: &str) -> Result<Self, Error> {
+         match lenient_semver::parse(version) {
+             Err(res) => Err(res.owned().into()),
+             Ok(parsed) => Ok(Self{
+                 original: String::from(version),
+                 parsed,
+             }),
+         }
     }
 }
 

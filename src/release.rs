@@ -4,10 +4,11 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
-use git2::{Signature, Time, Repository, Oid};
+use git2::{Signature, Time, Oid};
 use regex::Regex;
 
 use crate::config::ConventionSemverConfig;
+use crate::ConventionalRepo;
 
 custom_error! { pub Error
     VersionFileError{source: io::Error, file: String} = "Version file error({file}): {source}.",
@@ -30,8 +31,8 @@ impl VersionFile {
         })
     }
 
-    pub fn config_to_version_files(config: ConventionSemverConfig) -> Vec<VersionFile> {
-        match config.version_files {
+    pub fn config_to_version_files(config: &ConventionSemverConfig) -> Vec<VersionFile> {
+        match &config.version_files {
             None => vec![],
             Some(version_files) => {
                 version_files.iter().map(|v_file| -> VersionFile {
@@ -87,8 +88,7 @@ pub fn bump_version_files(repo_path: &str, version: &str, files: Vec<VersionFile
 /// Handling version files TBD.
 /// TODO: Should return conventional_semver::Error, don't expose the git2 lib
 /// to clients.
-pub fn tag_release(repo_path: &str, version: &str) -> Result<Oid, git2::Error> {
-    let repo = Repository::open(&repo_path)?;
+pub fn tag_release(repo: &ConventionalRepo, version: &str) -> Result<Oid, git2::Error> {
     // Tag the repository with a version
     let sig_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -96,6 +96,6 @@ pub fn tag_release(repo_path: &str, version: &str) -> Result<Oid, git2::Error> {
         .as_millis();
     let sig = Signature::new("rs-release", "rs-release@rust.com", &Time::new(sig_time.try_into().unwrap(), 0)).unwrap();
 
-    let head = repo.head()?.peel_to_commit().unwrap();
-    repo.tag(&version.to_string(), head.as_object(), &sig, "", false)
+    let head = repo.repo.head()?.peel_to_commit().unwrap();
+    repo.repo.tag(&version.to_string(), head.as_object(), &sig, "", false)
 }
