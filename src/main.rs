@@ -41,15 +41,16 @@ fn main() -> Result<(), conventional_semver_rs::Error> {
 
     let dirty = repo.is_repo_dirty()?;
     if args.bump_files && !dirty {
+        let v_files = release::VersionFile::config_to_version_files(&repo.config);
         let release_errors = release::bump_version_files(&args.path,
             &version,
-            release::VersionFile::config_to_version_files(&repo.config));
+            &v_files);
         if release_errors.len() > 0 {
             release_errors.iter().for_each(|e| {
                 eprintln!("{}", e);
             });
         }
-        // TODO: Commit the version files
+        release::commit_version_files(&repo, &version, &v_files)?;
     }
 
     if args.tag && !dirty {

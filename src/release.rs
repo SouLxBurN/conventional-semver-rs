@@ -6,6 +6,7 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use git2::{Signature, Time, Oid};
 use regex::Regex;
+use git2::Commit;
 
 use crate::config::ConventionSemverConfig;
 use crate::ConventionalRepo;
@@ -57,7 +58,7 @@ fn construct_matcher(prefix: String, postfix: String) -> Result<regex::Regex, re
 
 /// Update versions in various version files.
 /// package.josn, cargo.toml, etc.
-pub fn bump_version_files(repo_path: &str, version: &str, files: Vec<VersionFile>) -> Vec<Error> {
+pub fn bump_version_files(repo_path: &str, version: &str, files: &Vec<VersionFile>) -> Vec<Error> {
     files.iter().filter_map(|f| -> Option<Error> {
         // Get file based on relative path
         let str_pth = format!("{}/{}", repo_path, f.relative_path).to_string();
@@ -94,8 +95,49 @@ pub fn tag_release(repo: &ConventionalRepo, version: &str) -> Result<Oid, git2::
         .duration_since(UNIX_EPOCH)
         .expect("We broke space and time")
         .as_millis();
+    // TODO Signature should probably be part of the configuration.
     let sig = Signature::new("rs-release", "rs-release@rust.com", &Time::new(sig_time.try_into().unwrap(), 0)).unwrap();
 
     let head = repo.repo.head()?.peel_to_commit().unwrap();
     repo.repo.tag(&version.to_string(), head.as_object(), &sig, "", false)
 }
+
+pub fn commit_version_files(
+    cr: &ConventionalRepo,
+    version: &str,
+    version_files: &Vec<VersionFile>
+) -> Result<Oid, git2::Error> {
+
+    let sig_time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("We broke space and time")
+        .as_millis();
+    let sig = Signature::new("rs-release", "rs-release@rust.com", &Time::new(sig_time.try_into().unwrap(), 0)).unwrap();
+
+    let head = cr.repo.head()?;
+    let commit = head.peel_to_commit()?;
+    let parent_commits: [&Commit; 1] = [&commit];
+
+    let mut index = cr.repo.index()?;
+    version_files.iter().for_each(|v: &VersionFile| {
+        if let Err(e) = index.add_path(&Path::new(&v.relative_path)) {
+            eprintln!("Error Encountered {}", e);
+        }
+    });
+    index.write()?;
+
+    // Regrab index from repo, to prevent staging old changes.
+    let mut index = cr.repo.index()?;
+    let oid = index.write_tree()?;
+    let commit_tree = cr.repo.find_tree(oid)?;
+
+    cr.repo.commit(
+        Some("HEAD"),
+        &sig,
+        &sig,
+        &format!("chore(release): created release {}", version).to_owned(),
+        &commit_tree,
+        &parent_commits
+    )
+}
+
