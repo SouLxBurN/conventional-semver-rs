@@ -28,15 +28,14 @@ struct CmdArgs {
 fn main() -> Result<(), conventional_semver_rs::Error> {
     let args = CmdArgs::parse();
 
-    let mut repo = conventional_semver_rs::ConventionalRepo::new(&args.path)?;
+    let repo = conventional_semver_rs::ConventionalRepo::new(&args.path)?;
 
-    repo.config.v = repo.config.v || args.lead_v;
     let mut version = repo.derive_version(args.release)?;
-    let insert_v = !version.starts_with(|begin: char| begin.eq_ignore_ascii_case(&'v'));
-    if repo.config.v && insert_v  {
-        version.insert(0, 'v');
+    if !version.starts_with(|begin: char| begin.eq_ignore_ascii_case(&'v')) {
+        if repo.config.v.unwrap_or(false) || args.lead_v {
+            version.insert(0, 'v');
+        }
     }
-
     println!("{}", version);
 
     let dirty = repo.is_repo_dirty()?;

@@ -6,19 +6,20 @@ const CONFIG_PATH: &str = "conventional_release.toml";
 
 #[derive(Deserialize, Debug)]
 pub struct ConventionSemverConfig {
-    pub v: bool,
+    pub v: Option<bool>,
     pub version_files: Option<Vec<VersionFileConfig>>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct VersionFileConfig {
+    pub v: Option<bool>,
     pub path: String,
     pub version_prefix: Option<String>,
     pub version_postfix: Option<String>,
 }
 
 impl ConventionSemverConfig {
-    pub fn new(v: bool, version_files: Vec<VersionFileConfig>) -> Self {
+    pub fn new(v: Option<bool>, version_files: Vec<VersionFileConfig>) -> Self {
         Self {
             v,
             version_files: Some(version_files)
@@ -27,7 +28,7 @@ impl ConventionSemverConfig {
 
     pub fn default() -> Self {
         Self {
-            v: false,
+            v: Some(false),
             version_files: None
         }
     }

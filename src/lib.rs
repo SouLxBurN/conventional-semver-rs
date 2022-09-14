@@ -37,6 +37,8 @@ impl ConventionalRepo {
         let config = match config::ConventionSemverConfig::load_config() {
             Ok(cfg) => cfg,
             Err(e) => {
+                // TODO Error message sucks when file it not found.
+                // Make it more user friendly. Better Error Handling?
                 eprintln!("{e}");
                 eprintln!("Using default configuration");
                 config::ConventionSemverConfig::default()

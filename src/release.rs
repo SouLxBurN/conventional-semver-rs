@@ -22,13 +22,15 @@ static SEMVER_MATCHER: &str = r"[vV]?\d+\.\d+\.\d+[-+\w\.]*";
 pub struct VersionFile {
     relative_path: String,
     matcher: Regex,
+    v: bool,
 }
 impl VersionFile {
-    pub fn new(path: String, version_prefix: String, version_postfix: String) -> Result<Self, regex::Error> {
+    pub fn new(path: String, version_prefix: String, version_postfix: String, v: bool) -> Result<Self, regex::Error> {
         let regex = construct_matcher(version_prefix, version_postfix)?;
         Ok(VersionFile{
             relative_path: path,
             matcher: regex,
+            v,
         })
     }
 
@@ -41,6 +43,10 @@ impl VersionFile {
                         v_file.path.clone(),
                         v_file.version_prefix.as_ref().unwrap().clone(),
                         v_file.version_postfix.as_ref().unwrap().clone(),
+                        match v_file.v {
+                            Some(v) => v,
+                            None => false,
+                        },
                     ).unwrap()
                 }).collect()
             }
@@ -59,6 +65,11 @@ fn construct_matcher(prefix: String, postfix: String) -> Result<regex::Regex, re
 /// Update versions in various version files.
 /// package.josn, cargo.toml, etc.
 pub fn bump_version_files(repo_path: &str, version: &str, files: &Vec<VersionFile>) -> Vec<Error> {
+    let version = match version.strip_prefix("v") {
+        Some(v) => v,
+        None => version,
+    };
+
     files.iter().filter_map(|f| -> Option<Error> {
         // Get file based on relative path
         let str_pth = format!("{}/{}", repo_path, f.relative_path).to_string();
@@ -73,7 +84,12 @@ pub fn bump_version_files(repo_path: &str, version: &str, files: &Vec<VersionFil
             Some(c) => c,
             None => return Some(Error::VersionMatchError{file: f.relative_path.clone()}),
         };
-        let cow = f.matcher.replace_all(&contents, format!("{}{}{}", cap[1].to_string(), version, cap[2].to_string()));
+
+        let fmt_str = match f.v {
+            true => format!("{}v{}{}", cap[1].to_string(), version, cap[2].to_string()),
+            false => format!("{}{}{}", cap[1].to_string(), version, cap[2].to_string()),
+        };
+        let cow = f.matcher.replace_all(&contents, fmt_str);
 
         // Don't write to file until files have been updated.
         // Update file
