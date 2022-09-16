@@ -37,9 +37,7 @@ impl ConventionalRepo {
         let config = match config::ConventionSemverConfig::load_config() {
             Ok(cfg) => cfg,
             Err(e) => {
-                // TODO Error message sucks when file it not found.
-                // Make it more user friendly. Better Error Handling?
-                eprintln!("{e}");
+                eprintln!("Unable to load conventional_release.toml: {}",e);
                 eprintln!("Using default configuration");
                 config::ConventionSemverConfig::default()
             }
@@ -48,7 +46,6 @@ impl ConventionalRepo {
             repo,
             config
         })
-
     }
 
     /// Checks if repo at `repo_path` is dirty.

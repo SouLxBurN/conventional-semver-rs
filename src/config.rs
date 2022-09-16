@@ -35,9 +35,9 @@ impl ConventionSemverConfig {
 
     pub fn load_config() -> Result<Self, io::Error> {
         let pth = Path::new(CONFIG_PATH);
-        let c_file = fs::read_to_string(pth).expect(&format!("{} not found.", CONFIG_PATH));
+        let c_file = fs::read_to_string(pth)?;
         let str = c_file.as_str();
-        let cfg: Self = toml::from_str::<ConventionSemverConfig>(str).expect(&format!("Failed to parse {}", CONFIG_PATH));
+        let cfg: Self = toml::from_str::<ConventionSemverConfig>(str)?;
         return Ok(cfg);
     }
 }

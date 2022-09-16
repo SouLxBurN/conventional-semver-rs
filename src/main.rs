@@ -25,7 +25,7 @@ struct CmdArgs {
     path: String
 }
 
-fn main() -> Result<(), conventional_semver_rs::Error> {
+fn main() -> anyhow::Result<()> {
     let args = CmdArgs::parse();
 
     let repo = conventional_semver_rs::ConventionalRepo::new(&args.path)?;

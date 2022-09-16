@@ -1,5 +1,6 @@
 extern crate custom_error;
 use custom_error::custom_error;
+use std::num::TryFromIntError;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::Path;
@@ -14,6 +15,8 @@ use crate::ConventionalRepo;
 custom_error! { pub Error
     VersionFileError{source: io::Error, file: String} = "Version file error({file}): {source}.",
     VersionMatchError{file: String} = "Unable find version in version file {file}",
+    SignatureError{source: TryFromIntError} = "Encountered error when attempting to create git signature timpstamp {source}",
+    GitError{source: git2::Error} = "An error occurred when performing an Git action: {source}",
 }
 
 static SEMVER_MATCHER: &str = r"[vV]?\d+\.\d+\.\d+[-+\w\.]*";
@@ -103,33 +106,31 @@ pub fn bump_version_files(repo_path: &str, version: &str, files: &Vec<VersionFil
 
 /// Tag Head commit of Repository as repo_path, with the provided version.
 /// Handling version files TBD.
-/// TODO: Should return conventional_semver::Error, don't expose the git2 lib
 /// to clients.
-pub fn tag_release(repo: &ConventionalRepo, version: &str) -> Result<Oid, git2::Error> {
+pub fn tag_release(repo: &ConventionalRepo, version: &str) -> Result<Oid, Error> {
     // Tag the repository with a version
     let sig_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .expect("We broke space and time")
+        .expect("We broke spacetime")
         .as_millis();
     // TODO Signature should probably be part of the configuration.
-    let sig = Signature::new("rs-release", "rs-release@rust.com", &Time::new(sig_time.try_into().unwrap(), 0)).unwrap();
-
+    let sig = Signature::new("rs-release", "rs-release@rust.com", &Time::new(sig_time.try_into()?, 0))?;
     let head = repo.repo.head()?.peel_to_commit().unwrap();
-    repo.repo.tag(&version.to_string(), head.as_object(), &sig, "", false)
+    Ok(repo.repo.tag(&version.to_string(), head.as_object(), &sig, "", false)?)
 }
 
 pub fn commit_version_files(
     cr: &ConventionalRepo,
     version: &str,
     version_files: &Vec<VersionFile>
-) -> Result<Oid, git2::Error> {
+) -> Result<Oid, Error> {
 
     let sig_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("We broke space and time")
         .as_millis();
-    let sig = Signature::new("rs-release", "rs-release@rust.com", &Time::new(sig_time.try_into().unwrap(), 0)).unwrap();
-
+    // TODO Signature should probably be part of the configuration.
+    let sig = Signature::new("rs-release", "rs-release@rust.com", &Time::new(sig_time.try_into()?, 0))?;
     let head = cr.repo.head()?;
     let commit = head.peel_to_commit()?;
     let parent_commits: [&Commit; 1] = [&commit];
@@ -147,13 +148,13 @@ pub fn commit_version_files(
     let oid = index.write_tree()?;
     let commit_tree = cr.repo.find_tree(oid)?;
 
-    cr.repo.commit(
+    Ok(cr.repo.commit(
         Some("HEAD"),
         &sig,
         &sig,
         &format!("chore(release): created release {}", version).to_owned(),
         &commit_tree,
         &parent_commits
-    )
+    )?)
 }
 
