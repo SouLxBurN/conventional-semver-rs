@@ -16,7 +16,7 @@ custom_error! { pub Error
     VersionFileError{source: io::Error, file: String} = "Version file error({file}): {source}.",
     VersionMatchError{file: String} = "Unable find version in version file {file}",
     SignatureError{source: TryFromIntError} = "Encountered error when attempting to create git signature timpstamp {source}",
-    GitError{source: git2::Error} = "An error occurred when performing an Git action: {source}",
+    GitError{source: git2::Error} = "An error occurred when performing a Git action: {source}",
 }
 
 static SEMVER_MATCHER: &str = r"[vV]?\d+\.\d+\.\d+[-+\w\.]*";

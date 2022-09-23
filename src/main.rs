@@ -39,7 +39,8 @@ fn main() -> anyhow::Result<()> {
     println!("{}", version);
 
     let dirty = repo.is_repo_dirty()?;
-    if args.bump_files && !dirty {
+    let tagged_head = repo.get_head_version().is_some();
+    if args.bump_files && !dirty && !tagged_head {
         let v_files = release::VersionFile::config_to_version_files(&repo.config);
         let release_errors = release::bump_version_files(&args.path,
             &version,
@@ -51,12 +52,9 @@ fn main() -> anyhow::Result<()> {
         }
         release::commit_version_files(&repo, &version, &v_files)?;
     }
-
-    if args.tag && !dirty {
-        let oid = release::tag_release(&repo, &version)?;
-        println!("Tag created successfully! {}", oid);
+    if (args.tag || args.bump_files) && !dirty && !tagged_head {
+        release::tag_release(&repo, &version)?;
     }
-
     Ok(())
 }
 

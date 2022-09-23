@@ -55,6 +55,15 @@ impl ConventionalRepo {
         Ok(!statuses.is_empty())
     }
 
+    /// If the branch head is tagged, this will return Some({version_string})
+    /// Otherwise, it returns None.
+    pub fn get_head_version(&self) -> Option<String> {
+        let head = self.repo.head().ok()?.peel_to_commit().unwrap();
+        let head_id = head.as_object().id();
+        let tags = get_revision_tags(&self.repo, head_id)?;
+        Some(determine_current_version(tags).original)
+    }
+
     pub fn derive_version(&self, is_release: bool) -> Result<String, Error> {
         let dirty = self.is_repo_dirty()?;
         let head = self.repo.head()?.peel_to_commit().unwrap();
