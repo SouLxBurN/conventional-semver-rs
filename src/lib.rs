@@ -37,6 +37,7 @@ impl ConventionalRepo {
         let config = match config::ConventionalSemverConfig::load_config() {
             Ok(cfg) => cfg,
             Err(e) => {
+                // TODO: Check if error is missing vs bad syntax in config.
                 eprintln!("Unable to load conventional_release.toml: {}",e);
                 eprintln!("Using default configuration");
                 config::ConventionalSemverConfig::default()
@@ -58,7 +59,7 @@ impl ConventionalRepo {
     /// If the branch head is tagged, this will return Some({version_string})
     /// Otherwise, it returns None.
     pub fn get_head_version(&self) -> Option<String> {
-        let head = self.repo.head().ok()?.peel_to_commit().unwrap();
+        let head = self.repo.head().ok()?.peel_to_commit().ok()?;
         let head_id = head.as_object().id();
         let tags = get_revision_tags(&self.repo, head_id)?;
         Some(determine_current_version(tags).original)
@@ -66,7 +67,7 @@ impl ConventionalRepo {
 
     pub fn derive_version(&self, is_release: bool) -> Result<String, Error> {
         let dirty = self.is_repo_dirty()?;
-        let head = self.repo.head()?.peel_to_commit().unwrap();
+        let head = self.repo.head()?.peel_to_commit()?;
         let head_id = head.as_object().id();
         match get_revision_tags(&self.repo, head_id) {
             Some(versions) if !dirty => {
@@ -133,7 +134,7 @@ fn dervive_next_version(repo: &Repository, head_id: Oid) -> Result<ParsedVersion
 /// Checks if the provided Oid is a tagged revision in the Repository.
 /// Returns a list of all the tag names if found.
 fn get_revision_tags(repo: &Repository, oid: Oid) -> Option<Vec<ParsedVersion>> {
-    let reg = Regex::new(r"^.*/([vV]?\d+\.\d+\.\d+.*)$").unwrap();
+    let reg = Regex::new(r"^.*/([vV]?\d+\.\d+\.\d+.*)$").ok()?;
     let tag_refs = repo.references_glob("refs/tags/*").ok()?;
     let tag_items: Vec<ParsedVersion> = tag_refs.filter_map(does_reference_target_commit(oid))
         .filter_map( |rev| -> Option<ParsedVersion> {
@@ -169,7 +170,7 @@ fn does_reference_target_commit(commit_id: Oid) -> impl FnMut(Result<Reference, 
 /// Crawls the repository refs from the refs HEAD to the most recent tag.
 fn derive_version_increase(repo: &Repository, mut refs: Revwalk) -> Result<VersionBumpDetails, Error> {
     let mut bump_type = VersionBump::PATCH;
-    let mut current_version = ParsedVersion::new("0.0.0").unwrap();
+    let mut current_version = ParsedVersion::new("0.0.0")?;
     let mut rev_count = 0u32;
 
     while let Some(oid) = refs.next().transpose()? {
@@ -204,7 +205,7 @@ fn determine_current_version(tags: Vec<ParsedVersion>) -> ParsedVersion {
         else {
             item
         }
-    }).unwrap().clone()
+    }).expect("Unable to determine the current version").clone()
 }
 
 /// Determines the next version bump based on the commit id provided.

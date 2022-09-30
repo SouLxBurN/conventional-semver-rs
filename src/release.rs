@@ -36,17 +36,19 @@ impl VersionFile {
         })
     }
 
-    pub fn config_to_version_files(config: &ConventionalSemverConfig) -> Vec<VersionFile> {
+    pub fn config_to_version_files(config: &ConventionalSemverConfig) -> anyhow::Result<Vec<VersionFile>> {
         match &config.version_files {
-            None => vec![],
+            None => Ok(vec![]),
             Some(version_files) => {
-                version_files.iter().map(|v_file| -> VersionFile {
-                    VersionFile::new(
+                version_files.iter().map(|v_file| -> anyhow::Result<VersionFile> {
+                    Ok(VersionFile::new(
                         v_file.path.clone(),
-                        v_file.version_prefix.as_ref().unwrap().clone(),
-                        v_file.version_postfix.as_ref().unwrap().clone(),
+                        v_file.version_prefix.as_ref()
+                            .unwrap_or(&String::from("")).clone(),
+                        v_file.version_postfix.as_ref()
+                            .unwrap_or(&String::from("")).clone(),
                         v_file.v
-                    ).unwrap()
+                    )?)
                 }).collect()
             }
         }
@@ -93,7 +95,9 @@ pub fn bump_version_files(repo_path: &str, version: &str, files: &Vec<VersionFil
         // Don't write to file until files have been updated.
         // Update file
         match File::options().write(true).open(pth) {
-            Ok(mut out_file) => out_file.write_all(cow.as_ref().as_bytes()).unwrap(),
+            Ok(mut out_file) => {
+                out_file.write_all(cow.as_ref().as_bytes()).err()?;
+            },
             Err(e) => return Some(Error::VersionFileError{source: e, file: f.relative_path.clone()}),
         }
         None
@@ -106,7 +110,7 @@ pub fn tag_release(repo: &ConventionalRepo, version: &str) -> Result<Oid, Error>
     let sig = Signature::now(
         &repo.config.commit_signature.name,
         &repo.config.commit_signature.email)?;
-    let head = repo.repo.head()?.peel_to_commit().unwrap();
+    let head = repo.repo.head()?.peel_to_commit()?;
     Ok(repo.repo.tag(&version.to_string(), head.as_object(), &sig, "", false)?)
 }
 

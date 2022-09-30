@@ -41,7 +41,7 @@ fn main() -> anyhow::Result<()> {
     let dirty = repo.is_repo_dirty()?;
     let tagged_head = repo.get_head_version().is_some();
     if args.bump_files && !dirty && !tagged_head {
-        let v_files = release::VersionFile::config_to_version_files(&repo.config);
+        let v_files = release::VersionFile::config_to_version_files(&repo.config)?;
         let release_errors = release::bump_version_files(&args.path,
             &version,
             &v_files);
