@@ -5,30 +5,67 @@ use std::{fs, io};
 const CONFIG_PATH: &str = "conventional_release.toml";
 
 #[derive(Deserialize, Debug)]
-pub struct ConventionSemverConfig {
-    pub v: Option<bool>,
+pub struct ConventionalSemverConfig {
+    #[serde(default = "ConventionalSemverConfig::default_v")]
+    pub v: bool,
     pub version_files: Option<Vec<VersionFileConfig>>,
+    #[serde(default = "CommitSignature::default_sig")]
+    pub commit_signature: CommitSignature,
+}
+
+impl ConventionalSemverConfig {
+    fn default_v() -> bool {
+        false
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct CommitSignature {
+    #[serde(default = "CommitSignature::default_sig_name")]
+    pub name: String,
+    #[serde(default = "CommitSignature::default_sig_email")]
+    pub email: String,
+}
+
+impl CommitSignature {
+    fn default_sig_name() -> String {
+        String::from("rs-release")
+    }
+
+    fn default_sig_email() -> String {
+        String::from("rs-release@rust.com")
+    }
+
+    fn default_sig() -> CommitSignature {
+        CommitSignature {
+            name: Self::default_sig_name(),
+            email: Self::default_sig_email(),
+        }
+    }
 }
 
 #[derive(Deserialize, Debug)]
 pub struct VersionFileConfig {
-    pub v: Option<bool>,
+    #[serde(default = "ConventionalSemverConfig::default_v")]
+    pub v: bool,
     pub path: String,
     pub version_prefix: Option<String>,
     pub version_postfix: Option<String>,
 }
 
-impl ConventionSemverConfig {
-    pub fn new(v: Option<bool>, version_files: Vec<VersionFileConfig>) -> Self {
+impl ConventionalSemverConfig {
+    pub fn new(v: bool, commit_signature: CommitSignature, version_files: Vec<VersionFileConfig>) -> Self {
         Self {
             v,
+            commit_signature,
             version_files: Some(version_files)
         }
     }
 
     pub fn default() -> Self {
         Self {
-            v: Some(false),
+            v: false,
+            commit_signature: CommitSignature::default_sig(),
             version_files: None
         }
     }
@@ -37,7 +74,7 @@ impl ConventionSemverConfig {
         let pth = Path::new(CONFIG_PATH);
         let c_file = fs::read_to_string(pth)?;
         let str = c_file.as_str();
-        let cfg: Self = toml::from_str::<ConventionSemverConfig>(str)?;
+        let cfg: Self = toml::from_str::<ConventionalSemverConfig>(str)?;
         return Ok(cfg);
     }
 }

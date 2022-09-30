@@ -27,19 +27,19 @@ struct VersionBumpDetails {
 }
 
 pub struct ConventionalRepo {
-    pub config: config::ConventionSemverConfig,
+    pub config: config::ConventionalSemverConfig,
     repo: git2::Repository
 }
 
 impl ConventionalRepo {
     pub fn new(repo_path: &str) -> Result<Self, Error> where Self: Sized {
         let repo = Repository::open(repo_path)?;
-        let config = match config::ConventionSemverConfig::load_config() {
+        let config = match config::ConventionalSemverConfig::load_config() {
             Ok(cfg) => cfg,
             Err(e) => {
                 eprintln!("Unable to load conventional_release.toml: {}",e);
                 eprintln!("Using default configuration");
-                config::ConventionSemverConfig::default()
+                config::ConventionalSemverConfig::default()
             }
         };
         Ok(ConventionalRepo{

@@ -32,7 +32,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut version = repo.derive_version(args.release)?;
     if !version.starts_with(|begin: char| begin.eq_ignore_ascii_case(&'v')) {
-        if repo.config.v.unwrap_or(false) || args.lead_v {
+        if repo.config.v || args.lead_v {
             version.insert(0, 'v');
         }
     }

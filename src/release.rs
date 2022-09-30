@@ -4,12 +4,11 @@ use std::num::TryFromIntError;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
-use git2::{Signature, Time, Oid};
+use git2::{Signature, Oid};
 use regex::Regex;
 use git2::Commit;
 
-use crate::config::ConventionSemverConfig;
+use crate::config::ConventionalSemverConfig;
 use crate::ConventionalRepo;
 
 custom_error! { pub Error
@@ -37,7 +36,7 @@ impl VersionFile {
         })
     }
 
-    pub fn config_to_version_files(config: &ConventionSemverConfig) -> Vec<VersionFile> {
+    pub fn config_to_version_files(config: &ConventionalSemverConfig) -> Vec<VersionFile> {
         match &config.version_files {
             None => vec![],
             Some(version_files) => {
@@ -46,10 +45,7 @@ impl VersionFile {
                         v_file.path.clone(),
                         v_file.version_prefix.as_ref().unwrap().clone(),
                         v_file.version_postfix.as_ref().unwrap().clone(),
-                        match v_file.v {
-                            Some(v) => v,
-                            None => false,
-                        },
+                        v_file.v
                     ).unwrap()
                 }).collect()
             }
@@ -104,38 +100,30 @@ pub fn bump_version_files(repo_path: &str, version: &str, files: &Vec<VersionFil
     }).collect()
 }
 
-/// Tag Head commit of Repository as repo_path, with the provided version.
-/// Handling version files TBD.
-/// to clients.
+/// Tag Head commit of Repository, with the provided version.
 pub fn tag_release(repo: &ConventionalRepo, version: &str) -> Result<Oid, Error> {
     // Tag the repository with a version
-    let sig_time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("We broke spacetime")
-        .as_millis();
-    // TODO Signature should probably be part of the configuration.
-    let sig = Signature::new("rs-release", "rs-release@rust.com", &Time::new(sig_time.try_into()?, 0))?;
+    let sig = Signature::now(
+        &repo.config.commit_signature.name,
+        &repo.config.commit_signature.email)?;
     let head = repo.repo.head()?.peel_to_commit().unwrap();
     Ok(repo.repo.tag(&version.to_string(), head.as_object(), &sig, "", false)?)
 }
 
 pub fn commit_version_files(
-    cr: &ConventionalRepo,
+    repo: &ConventionalRepo,
     version: &str,
     version_files: &Vec<VersionFile>
 ) -> Result<Oid, Error> {
+    let sig = Signature::now(
+        &repo.config.commit_signature.name,
+        &repo.config.commit_signature.email)?;
 
-    let sig_time = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("We broke space and time")
-        .as_millis();
-    // TODO Signature should probably be part of the configuration.
-    let sig = Signature::new("rs-release", "rs-release@rust.com", &Time::new(sig_time.try_into()?, 0))?;
-    let head = cr.repo.head()?;
+    let head = repo.repo.head()?;
     let commit = head.peel_to_commit()?;
     let parent_commits: [&Commit; 1] = [&commit];
 
-    let mut index = cr.repo.index()?;
+    let mut index = repo.repo.index()?;
     version_files.iter().for_each(|v: &VersionFile| {
         if let Err(e) = index.add_path(&Path::new(&v.relative_path)) {
             eprintln!("Error Encountered {}", e);
@@ -144,11 +132,11 @@ pub fn commit_version_files(
     index.write()?;
 
     // Regrab index from repo, to prevent staging old changes.
-    let mut index = cr.repo.index()?;
+    let mut index = repo.repo.index()?;
     let oid = index.write_tree()?;
-    let commit_tree = cr.repo.find_tree(oid)?;
+    let commit_tree = repo.repo.find_tree(oid)?;
 
-    Ok(cr.repo.commit(
+    Ok(repo.repo.commit(
         Some("HEAD"),
         &sig,
         &sig,
