@@ -72,9 +72,19 @@ impl ConventionalSemverConfig {
 
     pub fn load_config() -> Result<Self, io::Error> {
         let pth = Path::new(CONFIG_PATH);
-        let c_file = fs::read_to_string(pth)?;
-        let str = c_file.as_str();
-        let cfg: Self = toml::from_str::<ConventionalSemverConfig>(str)?;
-        return Ok(cfg);
+        match fs::read_to_string(pth) {
+            Ok(c_file) => {
+                let str = c_file.as_str();
+                Ok(toml::from_str::<ConventionalSemverConfig>(str)?)
+            },
+            Err(err) => {
+                if err.kind() == io::ErrorKind::NotFound {
+                    eprintln!("convention_release.toml not found, using default configuration");
+                    Ok(Self::default())
+                } else {
+                    Err(err)
+                }
+            }
+        }
     }
 }

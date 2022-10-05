@@ -2,6 +2,8 @@ pub mod release;
 pub mod config;
 extern crate custom_error;
 
+use std::io;
+
 use custom_error::custom_error;
 use git2::{Repository, ObjectType, Oid, Revwalk, Reference};
 use semver::{Prerelease, BuildMetadata};
@@ -11,6 +13,7 @@ custom_error! { pub Error
     SemverError{source: semver::Error} = "Encountered an invalid version: {source}.",
     LSemverError{source: lenient_semver::parser::OwnedError} = "Encountered an invalid version: {source}.",
     GitError{source: git2::Error} = "Git Error: {source}",
+    ConfigError{source: io::Error} = "Failed to parse conventional_release.toml {source}",
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -34,15 +37,7 @@ pub struct ConventionalRepo {
 impl ConventionalRepo {
     pub fn new(repo_path: &str) -> Result<Self, Error> where Self: Sized {
         let repo = Repository::open(repo_path)?;
-        let config = match config::ConventionalSemverConfig::load_config() {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                // TODO: Check if error is missing vs bad syntax in config.
-                eprintln!("Unable to load conventional_release.toml: {}",e);
-                eprintln!("Using default configuration");
-                config::ConventionalSemverConfig::default()
-            }
-        };
+        let config = config::ConventionalSemverConfig::load_config()?;
         Ok(ConventionalRepo{
             repo,
             config
