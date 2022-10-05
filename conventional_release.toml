@@ -1,8 +1,8 @@
 v = false
 
 [commit_signature]
-name = rs-release
-email = rs-release@rust.com
+name = "rs-release"
+email = "rs-release@rust.com"
 
 [[version_files]]
 v = false
