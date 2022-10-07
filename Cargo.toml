@@ -2,6 +2,15 @@
 name = "conventional-semver-rs"
 version = "0.1.0"
 edition = "2021"
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/soulxburn/conventional-semver-rs"
+categories = ["command-line-utilities", "development-tools"]
+keywords = ["git", "conventional-commit", "semver", "versioning"]
+description = """
+CLI and library to manage your git projects
+semantic version based on conventional commits
+"""
 
 [dependencies]
 semver = "1.0.10"
