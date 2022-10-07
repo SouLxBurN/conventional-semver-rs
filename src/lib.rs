@@ -47,7 +47,11 @@ impl ConventionalRepo {
     /// Checks if repo at `repo_path` is dirty.
     /// Returns Error result if unable to locate/open repository at `repo_path`.
     pub fn is_repo_dirty(&self) -> Result<bool, Error> {
-        let statuses = self.repo.statuses(None)?;
+        let mut status_options = &mut git2::StatusOptions::new();
+        status_options = status_options
+            .include_ignored(false)
+            .include_untracked(true);
+        let statuses = self.repo.statuses(Some(status_options))?;
         Ok(!statuses.is_empty())
     }
 
