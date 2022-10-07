@@ -39,7 +39,6 @@ fn main() -> anyhow::Result<()> {
     println!("{}", version);
 
     let dirty = repo.is_repo_dirty()?;
-    println!("{}", dirty);
     let tagged_head = repo.get_head_version().is_some();
     if args.bump_files && !dirty && !tagged_head {
         let v_files = release::VersionFile::config_to_version_files(&repo.config)?;
