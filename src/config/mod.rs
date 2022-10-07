@@ -29,11 +29,11 @@ pub struct CommitSignature {
 
 impl CommitSignature {
     fn default_sig_name() -> String {
-        String::from("rs-release")
+        String::from("conventional-semver-rs")
     }
 
     fn default_sig_email() -> String {
-        String::from("rs-release@rust.com")
+        String::from("conventional-semver-rs@github.com")
     }
 
     fn default_sig() -> CommitSignature {

@@ -28,19 +28,31 @@ If `conventional_release.toml` is not found, a default configuration will be loa
 #### Default Configuration
 ```toml
 v = false
+
+[commit_signature]
+name = "conventional-semver-rs"
+email = "conventional-semver-rs@github.com"
 ```
 
 #### Configuration Options
 ```toml
 v = false # Include optional prefix v in generated version
 
+# Customize the commit signature when bumping files and creating tags
+[commit_signature]
+name = "conventional-semver-rs"
+email = "conventional-semver-rs@github.com"
+
 # Describes a file containing the application's version to be updated on release
-[[version_files]] path = "version.txt" # Relative path to file
+[[version_files]]
+v = true # Configure option prefix v for version file
+path = "version.txt" # Relative path to file
 version_prefix = "" # Token to match before the version
 version_postfix = "" # Token to match after the version
 
 # Cargo.toml example
 [[version_files]]
+v = false
 path = "Cargo.toml"
 version_prefix = "version = \""
 version_postfix = "\"[^,]"
