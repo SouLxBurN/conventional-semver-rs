@@ -13,7 +13,10 @@ custom_error! { pub Error
     SemverError{source: semver::Error} = "Encountered an invalid version: {source}.",
     LSemverError{source: lenient_semver::parser::OwnedError} = "Encountered an invalid version: {source}.",
     GitError{source: git2::Error} = "Git Error: {source}",
-    ConfigError{source: io::Error} = "Failed to parse conventional_release.toml {source}",
+    ConfigError{source: io::Error} = "Failed to load conventional_release.toml {source}",
+    TomlError{source: toml::de::Error} = "Failed to parse conventional_release.toml {source}",
+    PresetError{bad_preset: String} = "Unsupported preset found in conventional_release.toml: {bad_preset}",
+    InvalidConfigError{reason: String} = "conventional_release.toml is invalid: {reason}"
 }
 
 #[derive(Clone, PartialEq, Eq)]

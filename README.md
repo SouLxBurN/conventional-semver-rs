@@ -7,7 +7,7 @@ __Blazingly Fast__ 🚀 CLI tool for determining the next semantic version for a
 ## Usage
 ```
 USAGE:
-    conventional-semver-rs [OPTIONS] [PATH]
+    conver [OPTIONS] [PATH]
 
 ARGS:
     <PATH>    Path to target git repository [default: .]
@@ -56,6 +56,15 @@ v = false
 path = "Cargo.toml"
 version_prefix = "version = \""
 version_postfix = "\"[^,]"
+
+# Preset example
+# presets are for common version files,
+# so you don't have to write the regex!
+[[version_files]]
+preset = "package.json"
+# Currently Supported Presets
+# - "Cargo.toml"
+# - "package.json"
 ```
 
 ### Pre-release Versions

@@ -1,6 +1,10 @@
 use serde::Deserialize;
 use std::path::Path;
 use std::{fs, io};
+use std::str::FromStr;
+
+mod presets;
+use presets::FilePresets;
 
 const CONFIG_PATH: &str = "conventional_release.toml";
 
@@ -16,6 +20,9 @@ pub struct ConventionalSemverConfig {
 impl ConventionalSemverConfig {
     fn default_v() -> bool {
         false
+    }
+    fn default_path() -> String {
+        String::from("")
     }
 }
 
@@ -44,13 +51,15 @@ impl CommitSignature {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct VersionFileConfig {
     #[serde(default = "ConventionalSemverConfig::default_v")]
     pub v: bool,
+    #[serde(default = "ConventionalSemverConfig::default_path")]
     pub path: String,
     pub version_prefix: Option<String>,
     pub version_postfix: Option<String>,
+    pub preset: Option<String>,
 }
 
 impl ConventionalSemverConfig {
@@ -70,19 +79,38 @@ impl ConventionalSemverConfig {
         }
     }
 
-    pub fn load_config() -> Result<Self, io::Error> {
+    pub fn load_config() -> Result<Self, crate::Error> {
         let pth = Path::new(CONFIG_PATH);
         match fs::read_to_string(pth) {
             Ok(c_file) => {
                 let str = c_file.as_str();
-                Ok(toml::from_str::<ConventionalSemverConfig>(str)?)
+                let mut config = toml::from_str::<ConventionalSemverConfig>(str)?;
+                if config.version_files.is_some() {
+                    for mut f in config.version_files.as_mut().unwrap().iter_mut() {
+                        if let Some(pre) = &f.preset{
+                            let preset = FilePresets::from_str(&pre)?;
+                            let cp = presets::PRESETS.get(&preset).expect("Preset not part of preset map");
+                            f.v = cp.v.clone();
+                            f.path = cp.path.clone();
+                            f.version_prefix = cp.version_prefix.clone();
+                            f.version_postfix = cp.version_postfix.clone();
+                            f.preset = cp.preset.clone();
+                            ()
+                        } else if f.path == "" {
+                            return Err(crate::Error::InvalidConfigError{
+                                reason: String::from("version_file path cannot be blank, without a preset")
+                            })
+                        }
+                    };
+                }
+                Ok(config)
             },
             Err(err) => {
                 if err.kind() == io::ErrorKind::NotFound {
                     eprintln!("convention_release.toml not found, using default configuration");
                     Ok(Self::default())
                 } else {
-                    Err(err)
+                    Err(err.into())
                 }
             }
         }

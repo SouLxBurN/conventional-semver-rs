@@ -5,7 +5,4 @@ name = "rs-release"
 email = "rs-release@rust.com"
 
 [[version_files]]
-v = false
-path = "Cargo.toml"
-version_prefix = "version = \""
-version_postfix = "\"[^,]"
+preset = "Cargo.toml"
