@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::str::FromStr;
-use clap::once_cell::sync::Lazy;
+use once_cell::sync::Lazy;
 use super::VersionFileConfig;
 
 #[derive(Debug, Hash, Eq, PartialEq)]
